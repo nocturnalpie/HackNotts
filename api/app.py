@@ -16,8 +16,9 @@ with open("api_secret.key") as f:
 
 client = Client(account_sid, auth_token)
 
+
 @app.route('/clue')
-def hello_world():
+def get_clue():
   if request.headers.get('auth', False) and request.headers.get('number', False):
 
     if request.headers.get('auth', False) == api_token:
@@ -30,18 +31,21 @@ def hello_world():
       return 'Message Sent!'
   return "Error"
 
+
 @app.route('/guess', methods=['GET', 'POST'])
 def receive_answer():
-  if request.args.get('auth', False) == api_token:
+  if request.args.get('api', False) == api_token:
     resp = MessagingResponse()
 
     # Add a message
     resp.message("Ahoy! Thanks so much for your message.")
 
     return str(resp)
+  return "Error"
+
 
 if __name__ == '__main__':
-    # This is used when running locally only. When deploying to Google App
-    # Engine, a webserver process such as Gunicorn will serve the app. This
-    # can be configured by adding an `entrypoint` to app.yaml.
-    app.run(host='127.0.0.1', port=8080, debug=True)
+  # This is used when running locally only. When deploying to Google App
+  # Engine, a webserver process such as Gunicorn will serve the app. This
+  # can be configured by adding an `entrypoint` to app.yaml.
+  app.run(host='127.0.0.1', port=8080, debug=True)
