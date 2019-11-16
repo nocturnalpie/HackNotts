@@ -1,0 +1,6 @@
+{
+  "name": "Bubba",
+  "likes": ["coffee", "fashion", "meat", "music"],
+  "dislikes": ["technology", "animals", "vegetables", "exercise"],
+  "not-bothered": ["people", "looking good"]
+}
