@@ -1,0 +1,6 @@
+{
+  "name": "Florence",
+  "likes": ["technology", "meat", "vegetables", "exercise", "coffee"],
+  "dislikes": ["looking good", "fashion", "people"],
+  "not-bothered": ["animals", "music"]
+}
