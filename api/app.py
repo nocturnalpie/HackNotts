@@ -4,13 +4,13 @@ from twilio.rest import Client
 
 app = Flask(__name__)
 
-with open("../../API_KEYS/twilio_account_sid.key") as f:
+with open("twilio_account_sid.key") as f:
   account_sid = f.read()
 
-with open("../../API_KEYS/twilio_auth_token.key") as f:
+with open("twilio_auth_token.key") as f:
   auth_token = f.read()
 
-with open("../../API_KEYS/api_secret.key") as f:
+with open("api_secret.key") as f:
   api_token = f.read().strip()
 
 client = Client(account_sid, auth_token)
