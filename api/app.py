@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request
 from twilio.rest import Client
+from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
@@ -18,8 +19,7 @@ client = Client(account_sid, auth_token)
 @app.route('/clue')
 def hello_world():
   if request.headers.get('auth', False) and request.headers.get('number', False):
-    print("Here!")
-    print(api_token)
+
     if request.headers.get('auth', False) == api_token:
       message = client.messages \
         .create(
@@ -30,6 +30,15 @@ def hello_world():
       return 'Message Sent!'
   return "Error"
 
+@app.route('/guess', methods=['GET', 'POST'])
+def receive_answer():
+  if request.args.get('auth', False) == api_token:
+    resp = MessagingResponse()
+
+    # Add a message
+    resp.message("Ahoy! Thanks so much for your message.")
+
+    return str(resp)
 
 if __name__ == '__main__':
     # This is used when running locally only. When deploying to Google App
