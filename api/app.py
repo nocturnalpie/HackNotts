@@ -4,6 +4,64 @@ from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 import uuid
 import random
+import json
+import glob
+
+class Detective:
+  def __init__(self, file):
+    with open(file) as f:
+      data = json.load(f)
+    self.name = data["name"]
+    self.likes = data["likes"]
+    self.dislikes = data["dislikes"]
+    self.not_bothered = data["not-bothered"]
+
+  def getRandomLike(self):
+    return self.likes[random.randint(0,len(self.likes)-1)]
+
+  def getRandomDislike(self):
+    return self.dislikes[random.randint(0,len(self.dislikes)-1)]
+
+  def get3RandomFacts(self):
+    likes = []
+    dislikes = []
+    while len(likes + dislikes) < 3:
+      if random.randint(0,1):
+        rand = self.getRandomLike()
+        while rand in likes:
+          rand = self.getRandomLike()
+        likes.append(rand)
+      else:
+        rand = self.getRandomDislike()
+        while rand in dislikes:
+          rand = self.getRandomDislike()
+        dislikes.append(rand)
+    return likes, dislikes
+
+
+  def getStringLikes(self):
+    body = "You love "
+    for i in range(0, len(self.likes)):
+      body += self.likes[i]
+      if i == len(self.likes) - 1:
+        body += ".\n"
+      elif i == len(self.likes) - 2:
+        body += " and "
+      else:
+        body += ", "
+    return body
+
+  def getStringDislikes(self):
+    body = "You loath "
+    for i in range(0, len(self.dislikes)):
+      body += self.dislikes[i]
+      if i == len(self.dislikes) - 1:
+        body += ".\n"
+      elif i == len(self.dislikes) - 2:
+        body += " and "
+      else:
+        body += ", "
+    return body
 
 app = Flask(__name__)
 
@@ -16,11 +74,51 @@ with open("twilio_auth_token.key") as f:
 with open("api_secret.key") as f:
   api_token = f.read().strip()
 
+detectives = {}
+
+for file in glob.glob("./detectives/*.detective"):
+  print(file)
+  det = Detective(file)
+  detectives[det.name] = det
+
 client = Client(account_sid, auth_token)
 
 
 users = {}
+murderers = {}
 
+def send_det(number, detective, murderer, dets):
+  body = "-\nYou are "+detective.name+"!\n"
+  body += detective.getStringLikes()
+  body += detective.getStringDislikes()
+  body += "\n"
+  if detective == murderer:
+    body += "You are the murderer! Throw them off your scent!"
+  else:
+    likes, dislikes = murderer.get3RandomFacts()
+    for like in likes:
+        body += "The murderer likes "+like+".\n"
+    for dislike in dislikes:
+        body += "The murderer dislikes " + dislike + ".\n"
+
+  body += "\nThe suspect detectives are "
+  for i in range(0, len(dets)):
+    body += dets[i].name
+    if i == len(dets) - 1:
+      body += ".\n"
+    elif i == len(dets) - 2:
+      body += " and "
+    else:
+      body += ", "
+
+  body += "\nGood luck detective!"
+
+  message = client.messages \
+    .create(
+    body=body,
+    from_='+441754772060',
+    to=number
+  )
 
 @app.route('/begin', methods=['POST'])
 def start_game():
@@ -32,27 +130,24 @@ def start_game():
   data = request.json
 
   #format {number: name}
+  dets = list(detectives.values())
+  random.shuffle(list(detectives.values()))
+  count = 0
+  murderer = dets[random.randint(0,len(data))]
+  murderers[uuid_session] = murderer
+  game_dets = dets[0:len(data)+1]
   for number in data:
-    users[number] = {'name': data[number], 'session': uuid_session}
-    send_clue(number)
+    users[number] = {'name': data[number], 'session': uuid_session, 'detective': dets[count], 'number': number}
+    send_det(number, dets[count], murderer, game_dets)
+    count += 1
 
   return 'Sent the clues!'
 
 
-clues = ["The murderer's top is green", "The murderer loves music", "The murderer wears a hat"]
-
-def send_clue(number):
-  message = client.messages \
-    .create(
-    body=clues[random.randint(0,2)],
-    from_='+441754772060',
-    to=number
-  )
-
-def send_update(session_id, update, sender):
-  numbers = [number if users[number]['session'] == session_id else None for number in users]
+def send_update(user, update):
+  numbers = [number if users[number]['session'] == user['session'] else None for number in users]
   for number in numbers:
-    if number and number != sender:
+    if number and number != user['number']:
       message = client.messages \
         .create(
         body=update,
@@ -63,16 +158,17 @@ def send_update(session_id, update, sender):
 @app.route('/guess', methods=['GET', 'POST'])
 def receive_answer():
   winner = request.form.get('From')
+
   if request.args.get('api', False) == api_token and winner in users:
     resp = MessagingResponse()
 
-    if request.form.get('Body') == 'Nicole':
+    if request.form.get('Body') == murderers[users[winner]['session']].name:
       resp.message("Your guess is correct! You Win!")
       print(request.form)
-      send_update(users[winner]['session'], users[winner]['name']+" has correctly identified the murderer!", winner)
+      send_update(users[winner], users[winner]['detective'].name+" ("+users[winner]['name']+") has correctly identified the murderer: "+murderers[users[winner]['session']].name+"!")
     else:
-      resp.message("Oh no that was incorrect! You have been eliminated!")
-      send_update(users[winner]['session'], users[winner]['name'] + " has been murdered!", winner)
+      resp.message("Oh no that was incorrect! You have been murdered!")
+      send_update(users[winner], users[winner]['name'] + " has been murdered!")
     return str(resp)
   return "Error"
 
