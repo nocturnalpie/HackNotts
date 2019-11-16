@@ -2,6 +2,8 @@ from flask import Flask
 from flask import request
 from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
+import uuid
+import random
 
 app = Flask(__name__)
 
@@ -17,29 +19,60 @@ with open("api_secret.key") as f:
 client = Client(account_sid, auth_token)
 
 
-@app.route('/clue')
-def get_clue():
-  if request.headers.get('auth', False) and request.headers.get('number', False):
+users = {}
 
-    if request.headers.get('auth', False) == api_token:
+
+@app.route('/begin', methods=['POST'])
+def start_game():
+  if request.headers.get('auth', False) != api_token:
+    return 'Error'
+
+  uuid_session = uuid.uuid4()
+
+  data = request.json
+
+  #format {number: name}
+  for number in data:
+    users[number] = {'name': data[number], 'session': uuid_session}
+    send_clue(number)
+
+  return 'Sent the clues!'
+
+
+clues = ["The murderer's top is green", "The murderer loves music", "The murderer wears a hat"]
+
+def send_clue(number):
+  message = client.messages \
+    .create(
+    body=clues[random.randint(0,2)],
+    from_='+441754772060',
+    to=number
+  )
+
+def send_update(session_id, update, sender):
+  numbers = [number if users[number]['session'] == session_id else None for number in users]
+  for number in numbers:
+    if number and number != sender:
       message = client.messages \
         .create(
-        body="This is a clue!",
+        body=update,
         from_='+441754772060',
-        to='+447500300880'
+        to=number
       )
-      return 'Message Sent!'
-  return "Error"
-
 
 @app.route('/guess', methods=['GET', 'POST'])
 def receive_answer():
-  if request.args.get('api', False) == api_token:
+  winner = request.form.get('From')
+  if request.args.get('api', False) == api_token and winner in users:
     resp = MessagingResponse()
 
-    # Add a message
-    resp.message("Thank you for your guess")
-
+    if request.form.get('Body') == 'Nicole':
+      resp.message("Your guess is correct! You Win!")
+      print(request.form)
+      send_update(users[winner]['session'], users[winner]['name']+" has correctly identified the murderer!", winner)
+    else:
+      resp.message("Oh no that was incorrect! You have been eliminated!")
+      send_update(users[winner]['session'], users[winner]['name'] + " has been murdered!", winner)
     return str(resp)
   return "Error"
 
