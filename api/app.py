@@ -38,7 +38,7 @@ def receive_answer():
     resp = MessagingResponse()
 
     # Add a message
-    resp.message("Ahoy! Thanks so much for your message.")
+    resp.message("Thank you for your guess")
 
     return str(resp)
   return "Error"
