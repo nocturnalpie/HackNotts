@@ -86,6 +86,7 @@ client = Client(account_sid, auth_token)
 
 users = {}
 murderers = {}
+keys = {}
 
 def send_det(number, detective, murderer, dets):
   body = "-\nYou are "+detective.name+"!\n"
@@ -116,7 +117,7 @@ def send_det(number, detective, murderer, dets):
   message = client.messages \
     .create(
     body=body,
-    from_='+441754772060',
+    from_='+441522246253',
     to=number
   )
 
@@ -136,10 +137,13 @@ def start_game():
   murderer = dets[random.randint(0,len(data))]
   murderers[uuid_session] = murderer
   game_dets = dets[0:len(data)+1]
+  key_list = []
   for number in data:
-    users[number] = {'name': data[number], 'session': uuid_session, 'detective': dets[count], 'number': number}
+    users[number] = {'name': data[number], 'session': uuid_session, 'detective': dets[count], 'number': number, 'dead': False}
+    key_list.append(users[number])
     send_det(number, dets[count], murderer, game_dets)
     count += 1
+  keys[uuid_session] = key_list
 
   return 'Sent the clues!'
 
@@ -151,26 +155,57 @@ def send_update(user, update):
       message = client.messages \
         .create(
         body=update,
-        from_='+441754772060',
+        from_='+441522246253',
         to=number
       )
 
+def remove_session(key):
+  for entry in list(users.keys()):
+    if users[entry]['session'] == key:
+      users.pop(entry)
+  keys.pop(key)
+
 @app.route('/guess', methods=['GET', 'POST'])
 def receive_answer():
-  winner = request.form.get('From')
+  sender = request.form.get('From')
 
-  if request.args.get('api', False) == api_token and winner in users:
-    resp = MessagingResponse()
 
-    if request.form.get('Body') == murderers[users[winner]['session']].name:
+
+  resp = MessagingResponse()
+
+  if request.args.get('api', False) == api_token and sender in users:
+    user = users[sender]
+    if user['dead']:
+      resp.message("You are dead! You cannot make anymore guesses!")
+      return str(resp)
+    elif user['detective'].name == murderers[user['session']].name:
+      resp.message("You are the murderer! You cannot make any guesses!")
+      return str(resp)
+
+    if request.form.get('Body') == murderers[user['session']].name:
       resp.message("Your guess is correct! You Win!")
-      print(request.form)
-      send_update(users[winner], users[winner]['detective'].name+" ("+users[winner]['name']+") has correctly identified the murderer: "+murderers[users[winner]['session']].name+"!")
+      send_update(user, user['detective'].name+" ("+user['name']+") has correctly identified the murderer: "+murderers[user['session']].name+"!")
+      remove_session(user['session'])
     else:
-      resp.message("Oh no that was incorrect! You have been murdered!")
-      send_update(users[winner], users[winner]['name'] + " has been murdered!")
+
+      user['dead'] = True
+      send_update(user, user['name'] + " has been murdered!")
+      end = True
+      for ls in keys[user['session']]:
+        end = end and (ls['dead'] or ls['detective'].name == murderers[user['session']].name)
+      if end:
+        m = None
+        for ls in keys[user['session']]:
+          if ls['detective'].name == murderers[user['session']].name:
+            m = ls
+        send_update(m, "The murderer has killed you all! "+murderers[user['session']].name+" was the murderer all along!")
+        remove_session(user['session'])
+      else:
+        resp.message("Oh no that was incorrect! You have been murdered!")
     return str(resp)
-  return "Error"
+  else:
+    resp.message("Please sign up to play at https://dubiousdetectives.online!")
+    return str(resp)
 
 
 if __name__ == '__main__':
