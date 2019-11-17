@@ -189,7 +189,7 @@ def receive_answer():
     else:
 
       user['dead'] = True
-      send_update(user, user['name'] + " has been murdered!")
+
       end = True
       for ls in keys[user['session']]:
         end = end and (ls['dead'] or ls['detective'].name == murderers[user['session']].name)
@@ -202,6 +202,7 @@ def receive_answer():
         remove_session(user['session'])
       else:
         resp.message("Oh no that was incorrect! You have been murdered!")
+        send_update(user, user['name'] + " has been murdered!")
     return str(resp)
   else:
     resp.message("Please sign up to play at https://dubiousdetectives.online!")
