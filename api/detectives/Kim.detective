@@ -1,0 +1,6 @@
+{
+  "name": "Kim",
+  "likes": ["music", "people", "looking good", "fashion", "exercise"],
+  "dislikes": ["technology", "coffee","animals"],
+  "not-bothered": ["vegetables", "meat"]
+}
